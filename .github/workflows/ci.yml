@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  frontend:
+    name: Frontend · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+        working-directory: web
+      - run: npx vite build --mode demo
+        working-directory: web
+
+  backend:
+    name: Backend · sintaxis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: for f in server/src/*.js server/scripts/*.mjs; do node --check "$f"; done
+
+  infra:
+    name: Infra · shellcheck + reglas de Prometheus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck
+        run: shellcheck -S error $(find . -name '*.sh' -not -path './web/node_modules/*')
+      - name: Reglas de alertas (promtool)
+        run: |
+          docker run --rm -v "$PWD/deploy/stack/rules:/rules" --entrypoint promtool \
+            prom/prometheus:v2.53.0 check rules /rules/infra-alertas.yml
+      - name: Generador del stack (Python)
+        run: python3 -m py_compile deploy/stack/generar.py

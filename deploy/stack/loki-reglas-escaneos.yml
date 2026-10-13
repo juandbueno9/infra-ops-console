@@ -1,0 +1,31 @@
+# =====================================================================
+#  Infra Ops · alertas 24/7 de escaneos y ataques (Loki ruler)
+#  PENDIENTE DE ACTIVAR junto con el aviso por correo:
+#   1) Agregar a loki.yml el bloque "ruler" (alertmanager_url = el Alertmanager del stack).
+#   2) Copiar este archivo a /loki/rules/fake/escaneos.yml dentro del contenedor de Loki.
+#   3) Configurar el receptor de correo en alertmanager.yml.
+#  Mientras tanto, el panel (Seguridad → Escaneos y ataques) ya detecta y avisa en pantalla.
+# =====================================================================
+groups:
+  - name: infra-escaneos
+    interval: 1m
+    rules:
+      - alert: EscaneoWeb
+        expr: |
+          sum by (servidor, ip) (count_over_time({job=~"nginx|apache", tipo="acceso"} | regexp `^(?P<ip>\S+) .*?" (?P<status>\d{3}) ` | status=~"4.." | ip!="203.0.113.10" [10m])) > 50
+        for: 0m
+        labels: { origen: infra, severidad: advertencia, categoria: seguridad }
+        annotations:
+          resumen: "Escaneo web desde {{ $labels.ip }} contra {{ $labels.servidor }} ({{ $value }} errores 4xx en 10 min)"
+      - alert: RutaPeligrosaRespondio200
+        expr: |
+          sum by (servidor, ip) (count_over_time({job=~"nginx|apache", tipo="acceso"} |~ `(?i)(/\.env|/\.git/|/\.aws|169\.254\.169\.254|/latest/meta-data|/etc/passwd|\.\./\.\./|/config\.json|/dump\.sql)` | regexp `^(?P<ip>\S+) .*?" (?P<status>\d{3}) ` | status=~"2.." [10m])) > 0
+        labels: { origen: infra, severidad: critica, categoria: seguridad }
+        annotations:
+          resumen: "Ruta peligrosa respondió 200 a {{ $labels.ip }} en {{ $labels.servidor }}: posible fuga de información"
+      - alert: FuerzaBrutaSSH
+        expr: |
+          sum by (servidor, ip) (count_over_time({job="auth"} |~ `Failed password|Invalid user` | regexp `from (?P<ip>[0-9a-fA-F:.]+)` [10m])) > 20
+        labels: { origen: infra, severidad: advertencia, categoria: seguridad }
+        annotations:
+          resumen: "Fuerza bruta SSH desde {{ $labels.ip }} contra {{ $labels.servidor }} ({{ $value }} intentos en 10 min)"

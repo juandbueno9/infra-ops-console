@@ -1,0 +1,27 @@
+# CloudWatch (opcional, perfil "aws"). Usa el rol IAM de la instancia.
+apiVersion: v1alpha1
+sts-region: us-east-1
+discovery:
+  jobs:
+    - type: AWS/EC2
+      regions: [us-east-1]
+      period: 300
+      length: 300
+      metrics:
+        - { name: CPUCreditBalance, statistics: [Average] }
+        - { name: StatusCheckFailed, statistics: [Maximum] }
+        - { name: StatusCheckFailed_System, statistics: [Maximum] }
+    - type: AWS/EBS
+      regions: [us-east-1]
+      period: 300
+      length: 300
+      metrics:
+        - { name: BurstBalance, statistics: [Average] }
+        - { name: VolumeQueueLength, statistics: [Average] }
+static:
+  - name: facturacion
+    namespace: AWS/Billing
+    regions: [us-east-1]
+    dimensions: [ { name: Currency, value: USD } ]
+    metrics:
+      - { name: EstimatedCharges, statistics: [Maximum], period: 21600, length: 21600 }

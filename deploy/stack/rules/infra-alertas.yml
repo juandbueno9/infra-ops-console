@@ -1,0 +1,248 @@
+# =====================================================================
+#  Infra Ops · reglas de alerta de Prometheus
+#  severidad: critica | advertencia | info
+#  Mientras no se configure un canal (correo / Teams / Telegram), las
+#  alertas solo se ven en el panel (página Alertas) y en Alertmanager.
+# =====================================================================
+groups:
+  - name: infra-ops-console
+    rules:
+      # Siempre activa: sirve para el "vigilante del vigilante". Si deja de
+      # llegar a un servicio externo (heartbeat), el monitoreo está caído.
+      - alert: Watchdog
+        expr: vector(1)
+        labels: { origen: infra, severidad: info, categoria: monitoreo }
+        annotations:
+          resumen: "El monitoreo está vivo (alerta de control, siempre activa)"
+
+      - alert: ObjetivoSinDatos
+        expr: up == 0
+        for: 5m
+        labels: { origen: infra, severidad: advertencia, categoria: monitoreo }
+        annotations:
+          resumen: "Prometheus no puede leer {{ $labels.job }} en {{ $labels.instance }}"
+
+      - alert: MetricasAgenteDesactualizadas
+        expr: time() - max by (instance) (node_textfile_mtime_seconds) > 900
+        for: 5m
+        labels: { origen: infra, severidad: advertencia, categoria: monitoreo }
+        annotations:
+          resumen: "El agente infra de {{ $labels.instance }} no actualiza métricas hace {{ $value | humanizeDuration }}"
+
+  - name: infra-servidores
+    rules:
+      - alert: ServidorCaido
+        expr: up{job=~"node_exporter|ec2_nodes|node"} == 0
+        for: 2m
+        labels: { origen: infra, severidad: critica, categoria: servidores }
+        annotations:
+          resumen: "El servidor {{ $labels.instance }} no responde"
+
+      - alert: CPUAlta
+        expr: 100 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100 > 90
+        for: 10m
+        labels: { origen: infra, severidad: advertencia, categoria: servidores }
+        annotations:
+          resumen: "CPU de {{ $labels.instance }} en {{ $value | printf \"%.0f\" }} % hace más de 10 min"
+
+      - alert: MemoriaAlta
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 90
+        for: 10m
+        labels: { origen: infra, severidad: advertencia, categoria: servidores }
+        annotations:
+          resumen: "Memoria de {{ $labels.instance }} en {{ $value | printf \"%.0f\" }} %"
+
+      - alert: DiscoCasiLleno
+        expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) * 100 > 90
+        for: 5m
+        labels: { origen: infra, severidad: critica, categoria: servidores }
+        annotations:
+          resumen: "Disco {{ $labels.mountpoint }} de {{ $labels.instance }} al {{ $value | printf \"%.0f\" }} %"
+
+      # Predicción: al ritmo de las últimas 24 h, se llena en menos de 7 días
+      - alert: DiscoSeLlenaPronto
+        expr: predict_linear(node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"}[24h], 7 * 86400) < 0
+        for: 1h
+        labels: { origen: infra, severidad: advertencia, categoria: servidores }
+        annotations:
+          resumen: "Al ritmo actual, el disco / de {{ $labels.instance }} se llena en menos de 7 días"
+
+      - alert: CargaAlta
+        expr: node_load15 / count by (instance) (node_cpu_seconds_total{mode="idle"}) > 1.5
+        for: 15m
+        labels: { origen: infra, severidad: advertencia, categoria: servidores }
+        annotations:
+          resumen: "Carga de {{ $labels.instance }} en {{ $value | printf \"%.1f\" }}× los núcleos"
+
+      - alert: ServicioCaido
+        expr: infra_service_up == 0
+        for: 2m
+        labels: { origen: infra, severidad: critica, categoria: servidores }
+        annotations:
+          resumen: "El servicio {{ $labels.service }} está detenido en {{ $labels.instance }}"
+
+      - alert: ContenedorNoSaludable
+        expr: infra_container_unhealthy == 1
+        for: 5m
+        labels: { origen: infra, severidad: advertencia, categoria: servidores }
+        annotations:
+          resumen: "El contenedor {{ $labels.name }} está unhealthy en {{ $labels.instance }}"
+
+      - alert: ContenedorReiniciando
+        expr: increase(infra_container_restarts_total[15m]) > 3
+        labels: { origen: infra, severidad: advertencia, categoria: servidores }
+        annotations:
+          resumen: "El contenedor {{ $labels.name }} se reinició {{ $value | printf \"%.0f\" }} veces en 15 min"
+
+      - alert: ReinicioRequerido
+        expr: infra_reboot_required == 1
+        for: 24h
+        labels: { origen: infra, severidad: info, categoria: servidores }
+        annotations:
+          resumen: "{{ $labels.instance }} requiere reinicio desde hace más de 24 h"
+
+  - name: infra-sitios
+    rules:
+      - alert: SitioCaido
+        expr: probe_success{job=~"blackbox_http.*"} == 0
+        for: 2m
+        labels: { origen: infra, severidad: critica, categoria: sitios }
+        annotations:
+          resumen: "{{ $labels.instance }} no responde hace más de 2 min"
+
+      - alert: SitioLento
+        expr: avg_over_time(probe_duration_seconds{job=~"blackbox_http.*"}[10m]) > 3
+        for: 10m
+        labels: { origen: infra, severidad: advertencia, categoria: sitios }
+        annotations:
+          resumen: "{{ $labels.instance }} tarda {{ $value | printf \"%.1f\" }} s en responder"
+
+      - alert: CertificadoVencePronto
+        expr: (probe_ssl_earliest_cert_expiry{job=~"blackbox_http.*"} - time()) / 86400 < 21
+        for: 1h
+        labels: { origen: infra, severidad: advertencia, categoria: sitios }
+        annotations:
+          resumen: "El certificado de {{ $labels.instance }} vence en {{ $value | printf \"%.0f\" }} días"
+
+      - alert: CertificadoVenceMuyPronto
+        expr: (probe_ssl_earliest_cert_expiry{job=~"blackbox_http.*"} - time()) / 86400 < 7
+        for: 10m
+        labels: { origen: infra, severidad: critica, categoria: sitios }
+        annotations:
+          resumen: "El certificado de {{ $labels.instance }} vence en {{ $value | printf \"%.0f\" }} días"
+
+      - alert: CertificadoServidorVence
+        expr: (infra_tls_cert_expiry_seconds - time()) / 86400 < 21
+        for: 1h
+        labels: { origen: infra, severidad: advertencia, categoria: sitios }
+        annotations:
+          resumen: "El certificado de {{ $labels.domain }} en {{ $labels.instance }} vence en {{ $value | printf \"%.0f\" }} días ({{ $labels.renewal }})"
+
+  - name: infra-seguridad
+    rules:
+      - alert: PuertoCriticoExpuesto
+        expr: probe_success{job="exposicion_puertos",instance=~".*:(21|23|445|1433|1521|3306|3389|5432|5900|6379|9090|9100|10443|27017)"} == 1
+        for: 15m
+        labels: { origen: infra, severidad: critica, categoria: seguridad }
+        annotations:
+          resumen: "Puerto expuesto a Internet: {{ $labels.instance }} ({{ $labels.objetivo }})"
+
+      - alert: MuchosIntentosSSH
+        expr: infra_ssh_failed_logins_24h > 50
+        labels: { origen: infra, severidad: advertencia, categoria: seguridad }
+        annotations:
+          resumen: "{{ $value | printf \"%.0f\" }} intentos SSH fallidos en 24 h en {{ $labels.instance }}"
+
+      - alert: ParchesDeSeguridad
+        expr: infra_apt_security_pending > 0
+        for: 72h
+        labels: { origen: infra, severidad: info, categoria: seguridad }
+        annotations:
+          resumen: "{{ $labels.instance }} tiene {{ $value | printf \"%.0f\" }} actualizaciones de seguridad pendientes hace más de 3 días"
+
+      - alert: ServicioWindowsCaido
+        expr: windows_service_state{state="running", name=~"ntds|dns|netlogon|kdc|w32time"} == 0
+        for: 5m
+        labels: { origen: infra, severidad: critica, categoria: servidores }
+        annotations:
+          resumen: "El servicio {{ $labels.name }} está detenido en {{ $labels.instance }} (Active Directory / DNS)"
+
+      - alert: DiscoWindowsLleno
+        expr: 100 - 100 * windows_logical_disk_free_bytes{volume="C:"} / windows_logical_disk_size_bytes{volume="C:"} > 90
+        for: 15m
+        labels: { origen: infra, severidad: advertencia, categoria: servidores }
+        annotations:
+          resumen: "El disco C: de {{ $labels.instance }} está al {{ $value | printf \"%.0f\" }}%"
+
+      - alert: ReinicioPendiente
+        expr: infra_reboot_required == 1
+        for: 72h
+        labels: { origen: infra, severidad: info, categoria: seguridad }
+        annotations:
+          resumen: "{{ $labels.instance }} necesita reiniciarse para aplicar actualizaciones (kernel o librerías) hace más de 3 días"
+
+      - alert: ActualizacionesAcumuladas
+        expr: infra_apt_upgrades_pending > 30
+        for: 168h
+        labels: { origen: infra, severidad: info, categoria: seguridad }
+        annotations:
+          resumen: "{{ $labels.instance }} acumula {{ $value | printf \"%.0f\" }} actualizaciones pendientes hace más de una semana"
+
+      - alert: VulnerabilidadesCriticas
+        expr: sum by (instance, image) (infra_image_vulnerabilities{severity="CRITICAL"}) > 0
+        labels: { origen: infra, severidad: advertencia, categoria: seguridad }
+        annotations:
+          resumen: "La imagen {{ $labels.image }} en {{ $labels.instance }} tiene {{ $value | printf \"%.0f\" }} vulnerabilidades críticas"
+
+  - name: infra-red
+    rules:
+      - alert: VPNSedeCaida
+        expr: probe_success{job="red_sede",capa="vpn"} == 0
+        for: 1m
+        labels: { origen: infra, severidad: critica, categoria: red }
+        annotations:
+          resumen: "No responde la VPN entre AWS y la sede principal"
+
+      - alert: AgenciaSinConexion
+        expr: probe_success{job="red_agencias"} == 0
+        for: 1m
+        labels: { origen: infra, severidad: critica, categoria: red }
+        annotations:
+          resumen: "Agencia {{ $labels.agencia }} sin conexión ({{ $labels.instance }})"
+
+      - alert: AgenciaDegradada
+        expr: 1 - avg_over_time(probe_success{job="red_agencias"}[10m]) > 0.05
+        for: 5m
+        labels: { origen: infra, severidad: advertencia, categoria: red }
+        annotations:
+          resumen: "Agencia {{ $labels.agencia }} con {{ $value | humanizePercentage }} de pérdida"
+
+  - name: infra-bases-datos
+    rules:
+      - alert: MySQLCaido
+        expr: mysql_up == 0
+        for: 1m
+        labels: { origen: infra, severidad: critica, categoria: bases-datos }
+        annotations:
+          resumen: "MySQL no responde en {{ $labels.instance }}"
+
+      - alert: MySQLConexionesAltas
+        expr: mysql_global_status_threads_connected / mysql_global_variables_max_connections > 0.8
+        for: 5m
+        labels: { origen: infra, severidad: advertencia, categoria: bases-datos }
+        annotations:
+          resumen: "MySQL usa {{ $value | humanizePercentage }} de las conexiones máximas"
+
+      - alert: PostgresCaido
+        expr: pg_up == 0
+        for: 1m
+        labels: { origen: infra, severidad: critica, categoria: bases-datos }
+        annotations:
+          resumen: "PostgreSQL no responde en {{ $labels.instance }}"
+
+      - alert: PostgresConexionesAltas
+        expr: sum by (instance) (pg_stat_activity_count) / max by (instance) (pg_settings_max_connections) > 0.8
+        for: 5m
+        labels: { origen: infra, severidad: advertencia, categoria: bases-datos }
+        annotations:
+          resumen: "PostgreSQL usa {{ $value | humanizePercentage }} de las conexiones máximas"

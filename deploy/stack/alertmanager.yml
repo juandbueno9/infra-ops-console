@@ -1,0 +1,23 @@
+# Alertmanager de la empresa.
+# El canal de avisos (correo / Teams / Telegram) se configura al final:
+# por ahora las alertas se agrupan aquí y se ven en el panel, sin enviarse.
+route:
+  receiver: pendiente
+  group_by: [alertname, instance]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [ 'alertname = "Watchdog"' ]
+      receiver: pendiente
+      repeat_interval: 5m
+receivers:
+  - name: pendiente
+inhibit_rules:
+  # Si el servidor está caído, no repetir alertas de sus servicios
+  - source_matchers: [ 'alertname = "ServidorCaido"' ]
+    target_matchers: [ 'severidad =~ "advertencia|info"' ]
+    equal: [instance]
+  - source_matchers: [ 'alertname = "CertificadoVenceMuyPronto"' ]
+    target_matchers: [ 'alertname = "CertificadoVencePronto"' ]
+    equal: [instance]

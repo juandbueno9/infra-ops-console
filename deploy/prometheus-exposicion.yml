@@ -1,0 +1,46 @@
+# =====================================================================
+#  Exposición de puertos a Internet (auditoría externa)
+#
+#  Blackbox intenta abrir una conexión TCP a cada puerto sensible de tus
+#  dominios e IPs públicas cada 5 minutos. Si conecta = el puerto está
+#  expuesto a Internet. El panel lo muestra en Sitios web y SSL.
+#
+#  1) blackbox.yml (en el servidor, junto a prometheus.yml) debe tener el
+#     módulo tcp_connect. Si no está, agrégalo dentro de "modules:":
+#
+#       tcp_connect:
+#         prober: tcp
+#         timeout: 5s
+#
+#     y reinicia blackbox:  sudo docker compose restart blackbox_exporter
+#
+#  2) Pega este job en prometheus.yml debajo de blackbox_http, valida con
+#     promtool y recarga (mismos pasos que prometheus-blackbox.yml).
+#
+#  Solo hace un "connect" TCP (como un navegador), no explota ni envía datos.
+#  Escanear IPs de terceros (hosting de empresa.com, proveedor de la
+#  sucursal) es liviano, pero avisa al proveedor si tienen IDS.
+# =====================================================================
+
+  - job_name: 'exposicion_puertos'
+    scrape_interval: 5m
+    scrape_timeout: 10s
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - labels: { objetivo: 'empresa.com', propietario: 'Hosting externo' }
+        targets: [empresa.com:21, empresa.com:22, empresa.com:23, empresa.com:25, empresa.com:80, empresa.com:443, empresa.com:445, empresa.com:1433, empresa.com:1521, empresa.com:3306, empresa.com:3389, empresa.com:5432, empresa.com:5900, empresa.com:6379, empresa.com:8080, empresa.com:8443, empresa.com:9090, empresa.com:9100, empresa.com:10443, empresa.com:27017]
+      - labels: { objetivo: 'sucursalvirtual.empresa.com', propietario: 'Proveedor externo (Google Cloud)' }
+        targets: [sucursalvirtual.empresa.com:21, sucursalvirtual.empresa.com:22, sucursalvirtual.empresa.com:23, sucursalvirtual.empresa.com:25, sucursalvirtual.empresa.com:80, sucursalvirtual.empresa.com:443, sucursalvirtual.empresa.com:445, sucursalvirtual.empresa.com:1433, sucursalvirtual.empresa.com:1521, sucursalvirtual.empresa.com:3306, sucursalvirtual.empresa.com:3389, sucursalvirtual.empresa.com:5432, sucursalvirtual.empresa.com:5900, sucursalvirtual.empresa.com:6379, sucursalvirtual.empresa.com:8080, sucursalvirtual.empresa.com:8443, sucursalvirtual.empresa.com:9090, sucursalvirtual.empresa.com:9100, sucursalvirtual.empresa.com:10443, sucursalvirtual.empresa.com:27017]
+      - labels: { objetivo: 'FortiGate oficina (WAN)', propietario: 'INFRA OPS-PPAL' }
+        targets: [203.0.113.10:21, 203.0.113.10:22, 203.0.113.10:23, 203.0.113.10:25, 203.0.113.10:80, 203.0.113.10:443, 203.0.113.10:445, 203.0.113.10:1433, 203.0.113.10:1521, 203.0.113.10:3306, 203.0.113.10:3389, 203.0.113.10:5432, 203.0.113.10:5900, 203.0.113.10:6379, 203.0.113.10:8080, 203.0.113.10:8443, 203.0.113.10:9090, 203.0.113.10:9100, 203.0.113.10:10443, 203.0.113.10:27017]
+      - labels: { objetivo: 'app-server', propietario: 'AWS EC2' }
+        targets: [203.0.113.11:21, 203.0.113.11:22, 203.0.113.11:23, 203.0.113.11:25, 203.0.113.11:80, 203.0.113.11:443, 203.0.113.11:445, 203.0.113.11:1433, 203.0.113.11:1521, 203.0.113.11:3306, 203.0.113.11:3389, 203.0.113.11:5432, 203.0.113.11:5900, 203.0.113.11:6379, 203.0.113.11:8080, 203.0.113.11:8443, 203.0.113.11:9090, 203.0.113.11:9100, 203.0.113.11:10443, 203.0.113.11:27017]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox_exporter:9115

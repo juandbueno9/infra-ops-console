@@ -1,0 +1,45 @@
+# Promtail: envía a Loki los logs del servidor (solo lectura).
+# __SERVIDOR__ lo reemplaza el instalador por el nombre del servidor.
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: warn
+positions:
+  filename: /positions/positions.yaml
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+scrape_configs:
+  - job_name: nginx
+    static_configs:
+      - targets: [localhost]
+        labels: { job: nginx, tipo: acceso, servidor: __SERVIDOR__, __path__: /var/log/nginx/*access*.log }
+      - targets: [localhost]
+        labels: { job: nginx, tipo: error, servidor: __SERVIDOR__, __path__: /var/log/nginx/*error*.log }
+  - job_name: sistema
+    static_configs:
+      - targets: [localhost]
+        labels: { job: auth, tipo: seguridad, servidor: __SERVIDOR__, __path__: /var/log/auth.log }
+      - targets: [localhost]
+        labels: { job: syslog, tipo: sistema, servidor: __SERVIDOR__, __path__: /var/log/syslog }
+      - targets: [localhost]
+        labels: { job: apache, tipo: acceso, servidor: __SERVIDOR__, __path__: /var/log/apache2/*access*.log }
+      - targets: [localhost]
+        labels: { job: apache, tipo: error, servidor: __SERVIDOR__, __path__: /var/log/apache2/*error*.log }
+      - targets: [localhost]
+        labels: { job: mysql, tipo: error, servidor: __SERVIDOR__, __path__: /var/log/mysql/error.log }
+      - targets: [localhost]
+        labels: { job: postgresql, tipo: error, servidor: __SERVIDOR__, __path__: /var/log/postgresql/*.log }
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: /(.*)
+        target_label: contenedor
+      - target_label: job
+        replacement: docker
+      - target_label: tipo
+        replacement: contenedor
+      - target_label: servidor
+        replacement: __SERVIDOR__

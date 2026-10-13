@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <script>
+      /* Tema antes de pintar (sin parpadeo): infra.theme = dark | light | auto */
+      (function () { try { var t = localStorage.getItem('infra.theme') || 'dark';
+        if (t === 'auto') t = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark';
+        document.querySelector('meta[name="color-scheme"]').setAttribute('content', document.documentElement.dataset.theme);
+      } catch (e) { document.documentElement.dataset.theme = 'dark'; } })();
+    </script>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M38.55 11.79L37.24 10.37L35.78 9.10L34.21 7.98L32.53 7.02L30.76 6.24L28.92 5.65L27.03 5.24L25.10 5.03L23.17 5.02L21.25 5.20L19.35 5.58L17.50 6.15L15.72 6.90L14.03 7.83L12.43 8.93L10.96 10.18L9.62 11.58L8.44 13.10L7.41 14.74L6.55 16.47L5.88 18.29L5.39 20.16L5.10 22.07L5.00 24.00L5.10 25.93L5.39 27.84L5.88 29.71L6.55 31.53L7.41 33.26L8.44 34.90L9.62 36.42L10.96 37.82L12.43 39.07L14.03 40.17L15.72 41.10L17.50 41.85L19.35 42.42L21.25 42.80L23.17 42.98L25.10 42.97L27.03 42.76L28.92 42.35L30.76 41.76L32.53 40.98L34.21 40.02L35.78 38.90L37.24 37.63L38.55 36.21L39.08 35.93L39.50 35.51L39.81 35.01L39.98 34.44L39.99 33.84L39.85 33.26L39.56 32.74L39.15 32.31L38.64 32.01L38.07 31.84L37.48 31.83L36.90 31.97L36.04 32.89L35.09 33.73L34.06 34.46L32.97 35.08L31.81 35.59L30.61 35.98L29.38 36.24L28.12 36.38L26.86 36.39L25.60 36.27L24.37 36.02L23.16 35.65L22.00 35.16L20.89 34.55L19.85 33.84L18.89 33.02L18.02 32.11L17.24 31.11L16.57 30.04L16.01 28.91L15.57 27.73L15.26 26.51L15.06 25.26L15.00 24.00L15.06 22.74L15.26 21.49L15.57 20.27L16.01 19.09L16.57 17.96L17.24 16.89L18.02 15.89L18.89 14.98L19.85 14.16L20.89 13.45L22.00 12.84L23.16 12.35L24.37 11.98L25.60 11.73L26.86 11.61L28.12 11.62L29.38 11.76L30.61 12.02L31.81 12.41L32.97 12.92L34.06 13.54L35.09 14.27L36.04 15.11L36.90 16.03L37.48 16.17L38.07 16.16L38.64 15.99L39.15 15.69L39.56 15.26L39.85 14.74L39.99 14.16L39.98 13.56L39.81 12.99L39.50 12.49L39.08 12.07Z' fill='%2338BDF8'/%3E%3Cpath d='M34.6 24a3.6 3.6 0 1 0 7.2 0a3.6 3.6 0 1 0 -7.2 0Z' fill='%2322D3EE'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;500;600;700;800&family=Jost:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <title>Infra Ops Console · Observabilidad</title>
+  </head>
+  <body class="bg-bg">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

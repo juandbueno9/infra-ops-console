@@ -1,0 +1,34 @@
+# =====================================================================
+#  Servicio systemd del backend (sirve también el frontend compilado)
+#
+#  Instalación en el servidor (ajusta la ruta si usas otra):
+#    sudo mkdir -p /opt/enterprise-tools/infra-ops-console-web
+#    # copiar el proyecto ahí (sin node_modules), con web/dist ya compilado
+#    cd /opt/enterprise-tools/infra-ops-console-web && npm --prefix server install --omit=dev
+#    cp server/.env.example server/.env        # PROM_URL=http://127.0.0.1:9090
+#    sudo cp deploy/infra-ops-console.service /etc/systemd/system/
+#    sudo systemctl daemon-reload && sudo systemctl enable --now infra-ops-console
+#    curl -s http://127.0.0.1:4000/api/health
+#
+#  Antes, verifica que el puerto 4000 esté libre:  sudo ss -tlnp | grep ':4000 '
+# =====================================================================
+[Unit]
+Description=Infra Ops · Centro de observabilidad (backend Node)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/enterprise-tools/infra-ops-console-web/server
+EnvironmentFile=/opt/enterprise-tools/infra-ops-console-web/server/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,70 @@
+# =====================================================================
+#  Monitoreo de sitios (Blackbox) · todos los proyectos de la empresa
+#
+#  En el servidor: /opt/enterprise-tools/infra-ops-console/prometheus/prometheus.yml
+#  Reemplaza el bloque  - job_name: 'blackbox_http'  por el de abajo.
+#
+#  Aplicar sin reiniciar (con copia y validación):
+#    cd /opt/enterprise-tools/infra-ops-console
+#    sudo cp prometheus/prometheus.yml prometheus/prometheus.yml.bak-$(date +%F-%H%M)
+#    sudo nano prometheus/prometheus.yml        # pega el bloque
+#    sudo docker run --rm -v "$PWD/prometheus:/p:ro" --entrypoint promtool prom/prometheus:latest check config /p/prometheus.yml
+#    curl -s -X POST http://127.0.0.1:9090/-/reload && echo RELOAD OK
+#
+#  ⚠ nano escribe en el mismo archivo (bien). No uses `sed -i`: el contenedor
+#    montó el archivo y no vería el cambio.
+#
+#  Quita de la lista los sitios que no quieras vigilar o que solo respondan
+#  desde la oficina (por ejemplo ocsinventory si nginx lo restringe por IP).
+# =====================================================================
+
+  - job_name: 'blackbox_http'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          # Sitio principal
+          - https://empresa.com/
+          # Sucursal virtual (proveedor externo)
+          - https://sucursalvirtual.empresa.com/cdigital/aplicacion/?id=4F1B75484C394A3C9821DE3919B9835E
+          # Producción
+          - https://consultas.empresa.com/
+          - https://contabilidad.empresa.com/
+          - https://crm.empresa.com/
+          - https://ems.empresa.com/
+          - https://extras.empresa.com/
+          - https://ingresos.empresa.com/
+          - https://ofrenda.empresa.com/
+          - https://solicitud-asociado.empresa.com/
+          # Herramientas internas
+          - https://monitoreo.empresa.com/
+          - https://vault.empresa.com/
+          - https://wiki.empresa.com/
+          - https://ocsinventory.empresa.com/
+          # Staging
+          - https://stg-api.empresa.com/
+          - https://stg-listas.empresa.com/
+          - https://stg-originacion.empresa.com/
+          - https://stg-taquilla.empresa.com/
+          - https://stg-cobranza.empresa.com/
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox_exporter:9115
+
+# =====================================================================
+#  Historial para uptime de 30 días
+#  Prometheus guarda 15 días por defecto. En docker-compose.yml, servicio
+#  prometheus → command, agrega esta línea:
+#
+#      - '--storage.tsdb.retention.time=90d'
+#
+#  y aplica:  sudo docker compose up -d --no-deps prometheus
+#  (los datos existentes se conservan en ./data/prometheus; ~10 s sin métricas)
+# =====================================================================
